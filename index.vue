@@ -17,15 +17,13 @@
       <div class="d">
         <button @click="mSel=mSel==='0'?'1':'0'" class="mode-btn">MODE: {{ mSel==='0'?'MINE':'BUILD' }}</button>
         <div class="pad-spacer"></div>
-        <!-- Compact D-Pad / Joystick Mesh Cluster Layout -->
-        <div class="pad-cluster">
-          <button class="p-btn u" @touchstart.prevent="vPad('u',1)" @touchend.prevent="vPad('u',0)">▲</button>
-          <button class="p-btn l" @touchstart.prevent="vPad('l',1)" @touchend.prevent="vPad('l',0)">◀</button>
-          <div class="ctrl-pad" ref="rPad" @touchstart.prevent="tpm" @touchmove.prevent="tpm" @touchend.prevent="tpe">
-            <div class="btn-inner">MOVE</div>
-          </div>
-          <button class="p-btn r" @touchstart.prevent="vPad('r',1)" @touchend.prevent="vPad('r',0)">▶</button>
-          <button class="p-btn dwn" @touchstart.prevent="vPad('d',1)" @touchend.prevent="vPad('d',0)">▼</button>
+        <!-- Oversized Mobile Gaming Cross D-Pad Shell Layout -->
+        <div class="dpad" ref="dpBox">
+          <button class="p-btn u" @touchstart.prevent="vPad('u',1)" @touchend.prevent="vPad('u',0)" @touchcancel.prevent="vPad('u',0)">▲</button>
+          <button class="p-btn l" @touchstart.prevent="vPad('l',1)" @touchend.prevent="vPad('l',0)" @touchcancel.prevent="vPad('l',0)">◀</button>
+          <div class="center-cap"></div>
+          <button class="p-btn r" @touchstart.prevent="vPad('r',1)" @touchend.prevent="vPad('r',0)" @touchcancel.prevent="vPad('r',0)">▶</button>
+          <button class="p-btn dwn" @touchstart.prevent="vPad('d',1)" @touchend.prevent="vPad('d',0)" @touchcancel.prevent="vPad('d',0)">▼</button>
         </div>
       </div>
     </footer>
@@ -35,12 +33,12 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 
-const g = ref(null), mSel = ref('1'), rPad = ref(null)
+const g = ref(null), mSel = ref('1'), dpBox = ref(null)
 const mClrs = { '1': '#8b5a2b', '2': '#708090', '3': '#a0522d', '4': '#228b22' }
 const mNames = { '0': 'Air (Mine)', '1': 'Dirt', '2': 'Stone', '3': 'Wood', '4': 'Leaves' }
 
 let ctx, tLoop, px = 4.5, py = 4.5, pa = 0, sx = 0, sy = 0, map = []
-let dyVector = 0, dxVector = 0, strafeV = 0 // Dual-axis velocity engines
+let dyVector = 0, dxVector = 0, strafeV = 0
 const mapW = 16, mapH = 16
 
 const initWorld = () => {
@@ -53,67 +51,54 @@ const initWorld = () => {
   }
 }
 
-// Bounded Dual-Axis Joystick Engine: Continuous Mapping to 4-Direction Axis Translation Vector
-const tpm = (e) => {
-  if (!e.touches.length || !rPad.value) return
-  const rect = rPad.value.getBoundingClientRect()
-  const touch = e.touches[0]
-  const normX = (touch.clientX - (rect.left + rect.width / 2)) / (rect.width / 2)
-  const normY = (touch.clientY - (rect.top + rect.height / 2)) / (rect.height / 2)
-  strafeV = Math.max(-1, Math.min(1, normX)) * 0.06 // Horizontal maps to Strafe Left/Right Vector
-  dyVector = Math.max(-1, Math.min(1, normY)) * -0.06 // Vertical maps to Forward/Backward Vector
-}
-const tpe = () => { strafeV = 0; dyVector = 0 }
-
-// Surrounding D-Pad Fixed-Trigger Engine for Digital Turning and Translation Keys
+// Fixed Hardware Layout Touch Pad Vector Direct Map
 const vPad = (dir, val) => {
-  if (dir === 'u') dyVector = val * 0.06
-  if (dir === 'd') dyVector = val * -0.06
-  if (dir === 'l') dxVector = val * -0.035 // Dedicated Turning Left Engine
-  if (dir === 'r') dxVector = val * 0.035  // Dedicated Turning Right Engine
+  if (dir === 'u') dyVector = val * 0.065
+  if (dir === 'd') dyVector = val * -0.065
+  if (dir === 'l') strafeV = val * -0.055
+  if (dir === 'r') strafeV = val * 0.055
 }
 
-// Global Touch drag configuration framework (Drag outside joystick maps to rotation / standard movement translation seamlessly)
+// Dual-Axis Canvas Drag Engine: Drag vertical maps to move translation, horizontal maps to turning angle
 const ts = (e) => { 
   if (!e.touches.length) return
-  const touch = e.touches[0]
-  if (!rPad.value || touch.clientX < rPad.value.getBoundingClientRect().left - 40) {
-    sx = touch.clientX; sy = touch.clientY 
+  const t = e.touches[0]
+  if (!dpBox.value || t.clientX < dpBox.value.getBoundingClientRect().left - 20) {
+    sx = t.clientX; sy = t.clientY 
   }
 }
 const tm = (e) => {
   if ((!sx && !sy) || !e.touches.length) return
-  const touch = e.touches[0]
-  let dx = touch.clientX - sx
-  let dy = touch.clientY - sy
+  const t = e.touches[0]
   
-  pa += dx * 0.008 // Horizontal touch drag updates camera gaze direction angle
-  let dragSpeed = dy * -0.0015
-  let nx = px + Math.cos(pa) * dragSpeed
-  let ny = py + Math.sin(pa) * dragSpeed
+  let dx = t.clientX - sx
+  let dy = t.clientY - sy
+  
+  pa += dx * 0.009 // Horizontal delta updates camera view rotation angle
+  
+  let walkSpeed = dy * -0.018 // Vertical delta drives translation forward/backward velocity matrix steps
+  let nx = px + Math.cos(pa) * walkSpeed
+  let ny = py + Math.sin(pa) * walkSpeed
   if (map[Math.floor(ny) * mapW + Math.floor(nx)] === '0') { px = nx; py = ny }
 
-  sx = touch.clientX; sy = touch.clientY
+  sx = t.clientX; sy = t.clientY
 }
 const te = () => { sx = 0; sy = 0 }
 
-// Voxel mining point execution
 const cc = () => {
   let tx = Math.floor(px + Math.cos(pa) * 1.5), ty = Math.floor(py + Math.sin(pa) * 1.5)
   if (tx > 0 && tx < mapW - 1 && ty > 0 && ty < mapH - 1) map[ty * mapW + tx] = mSel.value
 }
 
 const tick = () => {
-  if (dxVector !== 0) pa += dxVector // Rotational Delta
+  if (dxVector !== 0) pa += dxVector
 
-  // 4-Direction Cartesian Physics Vector Step Controller (Combines Front/Back and Strafe Translation)
   let mx = (dyVector !== 0 ? Math.cos(pa) * dyVector : 0) + (strafeV !== 0 ? Math.cos(pa + Math.PI / 2) * strafeV : 0)
   let my = (dyVector !== 0 ? Math.sin(pa) * dyVector : 0) + (strafeV !== 0 ? Math.sin(pa + Math.PI / 2) * strafeV : 0)
   
   let nx = px + mx, ny = py + my
   if (map[Math.floor(ny) * mapW + Math.floor(nx)] === '0') { px = nx; py = ny }
 
-  // Clear render engine setup buffer targets
   ctx.fillStyle = '#bae6fd'; ctx.fillRect(0, 0, 320, 120)
   ctx.fillStyle = '#222'; ctx.fillRect(0, 120, 320, 120)
 
@@ -144,10 +129,10 @@ onMounted(() => {
   tLoop = setInterval(tick, 1000 / 60)
 
   window.addEventListener('keydown', e => {
-    if (e.key === 'w' || e.key === 'ArrowUp') dyVector = 0.06
-    if (e.key === 's' || e.key === 'ArrowDown') dyVector = -0.06
-    if (e.key === 'a') strafeV = -0.06
-    if (e.key === 'd') strafeV = 0.06
+    if (e.key === 'w' || e.key === 'ArrowUp') dyVector = 0.065
+    if (e.key === 's' || e.key === 'ArrowDown') dyVector = -0.065
+    if (e.key === 'a') strafeV = -0.055
+    if (e.key === 'd') strafeV = 0.055
     if (e.key === 'ArrowLeft') dxVector = -0.035
     if (e.key === 'ArrowRight') dxVector = 0.035
   })
@@ -161,30 +146,28 @@ onUnmounted(() => clearInterval(tLoop))
 </script>
 
 <style scoped>
-.a { width: 100vw; height: 100vh; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 16px; box-sizing: border-box; font-family: sans-serif; user-select: none; overflow: hidden; }
-.b { text-align: center; width: 100%; } h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1.5px; color: #e2e8f0; } p { margin: 4px 0 0 0; color: #71717a; font-size: 12px; }
+.a { width: 100vw; height: 100vh; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px; box-sizing: border-box; font-family: sans-serif; user-select: none; overflow: hidden; }
+.b { text-align: center; width: 100%; } h1 { margin: 0; font-size: 18px; text-transform: uppercase; color: #e2e8f0; } p { margin: 2px 0 0 0; color: #71717a; font-size: 11px; }
 .c { width: 100%; max-width: 320px; aspect-ratio: 320 / 240; position: relative; border: 2px solid #1c1c1e; background: #222; overflow: hidden; }
 canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-.cross { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: #fff; transform: translate(-50%, -50%); pointer-events: none; opacity: 0.6; mix-blend-mode: difference; }
+.cross { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: #fff; transform: translate(-50%, -50%); pointer-events: none; opacity: 0.5; mix-blend-mode: difference; }
 
-.f { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+.f { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
 .inv { display: flex; justify-content: center; gap: 6px; }
-.inv button { width: 26px; height: 26px; border: 1px solid #2c2c2e; cursor: pointer; }
-.inv button.e { border: 2px solid #fff; transform: scale(1.15); }
+.inv button { width: 28px; height: 28px; border: 1px solid #2c2c2e; cursor: pointer; }
+.inv button.e { border: 2px solid #fff; transform: scale(1.1); }
 
-.d { display: flex; align-items: center; width: 100%; height: 110px; }
-.mode-btn { background: #1c1c1e; border: 1px solid #2c2c2e; color: #a1a1aa; padding: 10px 12px; font-weight: 700; cursor: pointer; font-size: 10px; text-transform: uppercase; }
+.d { display: flex; align-items: center; width: 100%; height: 130px; }
+.mode-btn { background: #1c1c1e; border: 1px solid #2c2c2e; color: #a1a1aa; padding: 14px 12px; font-weight: 700; font-size: 10px; text-transform: uppercase; cursor: pointer; }
 .pad-spacer { flex: 1; }
 
-/* D-Pad Composite Cluster Shell Layout */
-.pad-cluster { position: relative; width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; }
-.ctrl-pad { z-index: 2; width: 44px; height: 44px; background: #111112; border: 2px solid #3f3f46; border-radius: 50%; display: flex; align-items: center; justify-content: center; touch-action: none; }
-.ctrl-pad:active { border-color: #ef4444; background: #1c1c1e; }
-.btn-inner { font-size: 8px; font-weight: 800; color: #71717a; pointer-events: none; }
-.p-btn { position: absolute; width: 30px; height: 30px; background: #18181b; border: 1px solid #3f3f46; color: #a1a1aa; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; cursor: pointer; touch-action: none; z-index: 1; }
+/* Large High-Fidelity Tactical Mobile D-Pad Cross Architecture */
+.dpad { position: relative; width: 124px; height: 124px; display: flex; align-items: center; justify-content: center; background: rgba(24, 24, 27, 0.3); border-radius: 50%; }
+.center-cap { width: 42px; height: 42px; background: #18181b; border: 1px solid #27272a; z-index: 2; pointer-events: none; grid-area: center; box-shadow: inset 0 0 8px #000; }
+.p-btn { position: absolute; background: #27272a; border: 2px solid #3f3f46; color: #f4f4f5; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; cursor: pointer; touch-action: none; z-index: 3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
 .p-btn:active { background: #ef4444; color: #fff; border-color: #f43f5e; }
-.u { top: 0; left: 40px; }
-.dwn { bottom: 0; left: 40px; }
-.l { left: 0; top: 40px; }
-.r { right: 0; top: 40px; }
+.u { top: 0; left: 41px; width: 42px; height: 44px; border-radius: 8px 8px 0 0; border-bottom: none; }
+.dwn { bottom: 0; left: 41px; width: 42px; height: 44px; border-radius: 0 0 8px 8px; border-top: none; }
+.l { left: 0; top: 41px; width: 44px; height: 42px; border-radius: 8px 0 0 8px; border-right: none; }
+.r { right: 0; top: 41px; width: 44px; height: 42px; border-radius: 0 8px 8px 0; border-left: none; }
 </style>
