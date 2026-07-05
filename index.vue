@@ -19,9 +19,9 @@
       <div class="d">
         <button @click="mSel=mSel==='0'?'1':'0'" class="mode-btn">MODE: {{ mSel==='0'?'MINE':'BUILD' }}</button>
         <div class="pad-spacer"></div>
-        <!-- RHS Touch Engine Controller Ring Container -->
+        <!-- Upgraded RHS Dual-Axis Touch Joystick Ring Container -->
         <div class="ctrl-pad" ref="rPad" @touchstart.prevent="tpadStart" @touchmove.prevent="tpadMove" @touchend.prevent="tpadEnd">
-          <div class="btn-inner">STICK Y</div>
+          <div class="btn-inner">MOVE</div>
         </div>
       </div>
     </footer>
@@ -36,7 +36,7 @@ const mClrs = { '1': '#8b5a2b', '2': '#708090', '3': '#a0522d', '4': '#228b22' }
 const mNames = { '0': 'Air (Mine)', '1': 'Dirt', '2': 'Stone', '3': 'Wood', '4': 'Leaves' }
 
 let ctx, tLoop, px = 4.5, py = 4.5, pa = 0, sx = 0, map = []
-let dyVector = 0 // Velocity engine value mapped from the bounded RHS stick controller
+let dyVector = 0, dxVector = 0 // Dual-axis velocity engines mapped from the multi-directional stick
 const mapW = 16, mapH = 16
 
 const initWorld = () => {
@@ -49,42 +49,43 @@ const initWorld = () => {
   }
 }
 
-// Bounded RHS Stick Controller Actions
+// Bounded Dual-Axis Joystick Calculus Engine
 const tpadStart = (evt) => { tpadMove(evt) }
 
 const tpadMove = (evt) => {
   if (!evt.touches.length || !rPad.value) return
   const rect = rPad.value.getBoundingClientRect()
-  const touchY = evt.touches[0].clientY
+  const touch = evt.touches[0]
   
-  // Calculate vertical offset relative to the pad center node
+  // Calculate horizontal and vertical offsets relative to the pad's geometric center point
+  const cx = rect.left + rect.width / 2
   const cy = rect.top + rect.height / 2
-  const normY = (touchY - cy) / (rect.height / 2)
   
-  // Translate to a clean inverted velocity engine scalar (-0.08 to +0.08 max delta)
-  dyVector = Math.max(-1, Math.min(1, normY)) * -0.08
+  const normX = (touch.clientX - cx) / (rect.width / 2)
+  const normY = (touch.clientY - cy) / (rect.height / 2)
+  
+  // Track continuous multi-directional vectors cleanly inside baseline limits
+  dxVector = Math.max(-1, Math.min(1, normX)) * 0.04  // Rotation velocity factor
+  dyVector = Math.max(-1, Math.min(1, normY)) * -0.08 // Forward/Backward velocity factor
 }
 
-const tpadEnd = () => { dyVector = 0 }
+const tpadEnd = () => { dxVector = 0; dyVector = 0 }
 
-// Horizontal Look Angle Gesture Trackers
+// Manual screen swipe lookup backup triggers (Fires only outside joystick boundary box handles)
 const ts = (e) => { 
-  // Only register swipe looking actions if touch origin happens outside the RHS joystick layout box
   if (e.touches.length && (!rPad.value || e.touches[0].clientX < rPad.value.getBoundingClientRect().left)) {
     sx = e.touches[0].clientX 
   }
 }
-
 const tm = (e) => {
   if (!sx || !e.touches.length) return
   let dx = e.touches[0].clientX - sx
   pa += dx * 0.012
   sx = e.touches[0].clientX
 }
-
 const te = () => { sx = 0 }
 
-// Direct Screen Click Intersection Mining Handler
+// Direct Screen Center Voxel Mining Interaction Pipeline
 const cc = () => {
   let tx = Math.floor(px + Math.cos(pa) * 1.5)
   let ty = Math.floor(py + Math.sin(pa) * 1.5)
@@ -95,14 +96,19 @@ const cc = () => {
 
 // Global Core Engine Tick Update Frame loop
 const tick = () => {
-  // Apply the active velocity force scalar along the player's forward vector axis facing direction
+  // Apply real-time angular updates from horizontal joystick deflection
+  if (dxVector !== 0) {
+    pa += dxVector
+  }
+
+  // Apply real-time positional updates from vertical joystick deflection
   if (dyVector !== 0) {
     let nx = px + Math.cos(pa) * dyVector
     let ny = py + Math.sin(pa) * dyVector
     if (map[Math.floor(ny) * mapW + Math.floor(nx)] === '0') { px = nx; py = ny }
   }
 
-  // Clear scene and execute raycast sweep slices drawing pipeline
+  // Clear canvas view pane and process pseudo-3D raycast slice draws
   ctx.fillStyle = '#bae6fd'; ctx.fillRect(0, 0, 320, 120)
   ctx.fillStyle = '#222'; ctx.fillRect(0, 120, 320, 120)
 
@@ -138,11 +144,12 @@ onMounted(() => {
   window.addEventListener('keydown', e => {
     if (e.key === 'w' || e.key === 'ArrowUp') dyVector = 0.08
     if (e.key === 's' || e.key === 'ArrowDown') dyVector = -0.08
-    if (e.key === 'a' || e.key === 'ArrowLeft') pa -= 0.15
-    if (e.key === 'd' || e.key === 'ArrowRight') pa += 0.15
+    if (e.key === 'a' || e.key === 'ArrowLeft') dxVector = -0.04
+    if (e.key === 'd' || e.key === 'ArrowRight') dxVector = 0.04
   })
   window.addEventListener('keyup', e => {
     if (['w', 's', 'ArrowUp', 'ArrowDown'].includes(e.key)) dyVector = 0
+    if (['a', 'd', 'ArrowLeft', 'ArrowRight'].includes(e.key)) dxVector = 0
   })
 })
 
@@ -161,7 +168,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .inv button { width: 26px; height: 26px; border: 1px solid #2c2c2e; cursor: pointer; border-radius: 0; }
 .inv button.e { border: 2px solid #fff; transform: scale(1.15); }
 
-/* Unified Toolbar Overlay containing the right anchored tracking slider stick node */
+/* Bottom Toolbar Overlay Layouts featuring the fully functional 2D joystick module */
 .d { display: flex; align-items: center; width: 100%; height: 76px; }
 .mode-btn { background: #1c1c1e; border: 1px solid #2c2c2e; color: #a1a1aa; padding: 12px 14px; font-weight: 700; cursor: pointer; border-radius: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
 .mode-btn:active { background: #2c2c2e; color: #fff; }
