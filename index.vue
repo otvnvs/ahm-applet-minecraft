@@ -17,7 +17,7 @@
       <div class="d">
         <button @click="mSel=mSel==='0'?'1':'0'" class="mode-btn">MODE: {{ mSel==='0'?'MINE':'BUILD' }}</button>
         <div class="pad-spacer"></div>
-        <!-- Oversized Mobile Gaming Cross D-Pad Shell Layout -->
+        <!-- Mobile Gaming Layout: D-Pad with Turning on Horizontal and Translation on Vertical -->
         <div class="dpad" ref="dpBox">
           <button class="p-btn u" @touchstart.prevent="vPad('u',1)" @touchend.prevent="vPad('u',0)" @touchcancel.prevent="vPad('u',0)">▲</button>
           <button class="p-btn l" @touchstart.prevent="vPad('l',1)" @touchend.prevent="vPad('l',0)" @touchcancel.prevent="vPad('l',0)">◀</button>
@@ -38,7 +38,7 @@ const mClrs = { '1': '#8b5a2b', '2': '#708090', '3': '#a0522d', '4': '#228b22' }
 const mNames = { '0': 'Air (Mine)', '1': 'Dirt', '2': 'Stone', '3': 'Wood', '4': 'Leaves' }
 
 let ctx, tLoop, px = 4.5, py = 4.5, pa = 0, sx = 0, sy = 0, map = []
-let dyVector = 0, dxVector = 0, strafeV = 0
+let dyVector = 0, dxVector = 0
 const mapW = 16, mapH = 16
 
 const initWorld = () => {
@@ -51,15 +51,15 @@ const initWorld = () => {
   }
 }
 
-// Fixed Hardware Layout Touch Pad Vector Direct Map
+// Fixed D-Pad Trigger Vector Configuration Map
 const vPad = (dir, val) => {
-  if (dir === 'u') dyVector = val * 0.065
-  if (dir === 'd') dyVector = val * -0.065
-  if (dir === 'l') strafeV = val * -0.055
-  if (dir === 'r') strafeV = val * 0.055
+  if (dir === 'u') dyVector = val * 0.065   // Move Forward
+  if (dir === 'd') dyVector = val * -0.065  // Move Backward
+  if (dir === 'l') dxVector = val * -0.038  // Look/Turn Left
+  if (dir === 'r') dxVector = val * 0.038   // Look/Turn Right
 }
 
-// Dual-Axis Canvas Drag Engine: Drag vertical maps to move translation, horizontal maps to turning angle
+// 3D Scene Drag Matrix: Left/Right drags turn angle, Up/Down drags move forward/backward
 const ts = (e) => { 
   if (!e.touches.length) return
   const t = e.touches[0]
@@ -74,11 +74,13 @@ const tm = (e) => {
   let dx = t.clientX - sx
   let dy = t.clientY - sy
   
-  pa += dx * 0.009 // Horizontal delta updates camera view rotation angle
+  // Horizontal drag on view pane changes turning look direction angle
+  pa += dx * 0.009 
   
-  let walkSpeed = dy * -0.018 // Vertical delta drives translation forward/backward velocity matrix steps
-  let nx = px + Math.cos(pa) * walkSpeed
-  let ny = py + Math.sin(pa) * walkSpeed
+  // Vertical drag on view pane triggers forward/backward motion translation
+  let dragSpeed = dy * -0.018 
+  let nx = px + Math.cos(pa) * dragSpeed
+  let ny = py + Math.sin(pa) * dragSpeed
   if (map[Math.floor(ny) * mapW + Math.floor(nx)] === '0') { px = nx; py = ny }
 
   sx = t.clientX; sy = t.clientY
@@ -91,13 +93,13 @@ const cc = () => {
 }
 
 const tick = () => {
-  if (dxVector !== 0) pa += dxVector
+  if (dxVector !== 0) pa += dxVector // Apply continuous turning rotation
 
-  let mx = (dyVector !== 0 ? Math.cos(pa) * dyVector : 0) + (strafeV !== 0 ? Math.cos(pa + Math.PI / 2) * strafeV : 0)
-  let my = (dyVector !== 0 ? Math.sin(pa) * dyVector : 0) + (strafeV !== 0 ? Math.sin(pa + Math.PI / 2) * strafeV : 0)
-  
-  let nx = px + mx, ny = py + my
-  if (map[Math.floor(ny) * mapW + Math.floor(nx)] === '0') { px = nx; py = ny }
+  if (dyVector !== 0) {
+    let nx = px + Math.cos(pa) * dyVector
+    let ny = py + Math.sin(pa) * dyVector
+    if (map[Math.floor(ny) * mapW + Math.floor(nx)] === '0') { px = nx; py = ny }
+  }
 
   ctx.fillStyle = '#bae6fd'; ctx.fillRect(0, 0, 320, 120)
   ctx.fillStyle = '#222'; ctx.fillRect(0, 120, 320, 120)
@@ -131,15 +133,12 @@ onMounted(() => {
   window.addEventListener('keydown', e => {
     if (e.key === 'w' || e.key === 'ArrowUp') dyVector = 0.065
     if (e.key === 's' || e.key === 'ArrowDown') dyVector = -0.065
-    if (e.key === 'a') strafeV = -0.055
-    if (e.key === 'd') strafeV = 0.055
-    if (e.key === 'ArrowLeft') dxVector = -0.035
-    if (e.key === 'ArrowRight') dxVector = 0.035
+    if (e.key === 'a' || e.key === 'ArrowLeft') dxVector = -0.038
+    if (e.key === 'd' || e.key === 'ArrowRight') dxVector = 0.038
   })
   window.addEventListener('keyup', e => {
     if (['w', 's', 'ArrowUp', 'ArrowDown'].includes(e.key)) dyVector = 0
-    if (['a', 'd'].includes(e.key)) strafeV = 0
-    if (['ArrowLeft', 'ArrowRight'].includes(e.key)) dxVector = 0
+    if (['a', 'd', 'ArrowLeft', 'ArrowRight'].includes(e.key)) dxVector = 0
   })
 })
 onUnmounted(() => clearInterval(tLoop))
@@ -161,7 +160,6 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .mode-btn { background: #1c1c1e; border: 1px solid #2c2c2e; color: #a1a1aa; padding: 14px 12px; font-weight: 700; font-size: 10px; text-transform: uppercase; cursor: pointer; }
 .pad-spacer { flex: 1; }
 
-/* Large High-Fidelity Tactical Mobile D-Pad Cross Architecture */
 .dpad { position: relative; width: 124px; height: 124px; display: flex; align-items: center; justify-content: center; background: rgba(24, 24, 27, 0.3); border-radius: 50%; }
 .center-cap { width: 42px; height: 42px; background: #18181b; border: 1px solid #27272a; z-index: 2; pointer-events: none; grid-area: center; box-shadow: inset 0 0 8px #000; }
 .p-btn { position: absolute; background: #27272a; border: 2px solid #3f3f46; color: #f4f4f5; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; cursor: pointer; touch-action: none; z-index: 3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
